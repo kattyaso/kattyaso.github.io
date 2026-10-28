@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["226LBBW5ZT.com.katyaso.Kagoiri"],
+        "components": [
+          { "/": "/kagoiri/add", "comment": "カゴイリ: 送られてきた買い物リスト" },
+          { "/": "/kagoiri/add.html" }
+        ]
+      }
+    ]
+  }
+}

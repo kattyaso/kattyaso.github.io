@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>カゴイリ — 届いた買い物リスト</title>
+<!--
+  カゴイリの「リストを送る」で作ったリンクの受け取りページ。
+  品物は URL の「#」の後ろ（s=店の名前 / i=品名<TAB>メモ）にあり、サーバーには送られない。
+  アプリを持っている iPhone では、このページではなくアプリが開く（/.well-known/apple-app-site-association）。
+  LINE の中のブラウザなどでこのページが開いたときは「カゴイリで開く」（kagoiri://add#…）でアプリへ渡す。
+  形を変えるときはアプリの SharedList.swift と合わせる。
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --accent: #e8436f;
+    --canvas: #fff3f5;
+    --card: #ffffff;
+    --text: #222;
+    --sub: #777;
+    --line: #f1d9df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --canvas: #1c1416; --card: #2a2023; --text: #eee; --sub: #aaa; --line: #3c2e32; --accent: #ff6b92; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Maru Gothic ProN",
+                 "Hiragino Sans", Meiryo, sans-serif;
+    line-height: 1.6;
+  }
+  main { max-width: 30rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
+  h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+  .lead { color: var(--sub); margin: 0 0 1.25rem; font-size: .95rem; }
+  ul { list-style: none; margin: 0 0 1.5rem; padding: .25rem 1rem; background: var(--card); border-radius: 16px; }
+  li { display: flex; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: none; }
+  li::before { content: ""; flex: none; width: 1.1rem; height: 1.1rem; margin-top: .2rem;
+               border: 2px solid var(--accent); border-radius: 50%; }
+  .memo { color: var(--sub); margin-left: auto; }
+  .button { display: block; width: 100%; text-align: center; padding: .9rem 1rem; margin-bottom: .75rem;
+            border-radius: 999px; font-size: 1rem; font-weight: 700; text-decoration: none; border: none;
+            font-family: inherit; cursor: pointer; }
+  .primary { background: var(--accent); color: #fff; }
+  .secondary { background: var(--card); color: var(--accent); border: 1.5px solid var(--accent); }
+  .note { color: var(--sub); font-size: .85rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="list" hidden>
+    <h1 id="title">買い物リスト</h1>
+    <p class="lead">カゴイリで送られてきたリストです。</p>
+    <ul id="items"></ul>
+    <a class="button primary" id="open" href="#">カゴイリで開く</a>
+    <a class="button secondary" href="https://apps.apple.com/jp/app/id6822758042">App Store でカゴイリを見る</a>
+    <button class="button secondary" id="copy" type="button">文字でコピー</button>
+    <p class="note">「カゴイリで開く」を押しても何も起きないときは、カゴイリが入っていません。App Store から入れたあと、もう一度このリンクを開いてください。</p>
+  </section>
+  <section id="empty" hidden>
+    <h1>リストが見つかりません</h1>
+    <p class="lead">リンクが途中で切れているかもしれません。送った人に、もう一度送ってもらってください。</p>
+    <a class="button secondary" href="https://apps.apple.com/jp/app/id6822758042">App Store でカゴイリを見る</a>
+  </section>
+</main>
+<script>
+  (function () {
+    var fragment = location.hash.replace(/^#/, "");
+    var shop = null;
+    var entries = [];
+    fragment.split("&").forEach(function (pair) {
+      var i = pair.indexOf("=");
+      if (i < 0) return;
+      var key = pair.slice(0, i);
+      var value;
+      try { value = decodeURIComponent(pair.slice(i + 1)).trim(); } catch (e) { return; }
+      if (!value) return;
+      if (key === "s") shop = value;
+      if (key === "i" && entries.length < 100) {
+        var tab = value.indexOf("\t");
+        var name = (tab < 0 ? value : value.slice(0, tab)).trim();
+        var memo = tab < 0 ? "" : value.slice(tab + 1).trim();
+        if (name) entries.push({ name: name, memo: memo });
+      }
+    });
+
+    if (entries.length === 0) {
+      document.getElementById("empty").hidden = false;
+      return;
+    }
+    document.getElementById("list").hidden = false;
+    document.getElementById("title").textContent =
+      "買い物リスト（" + (shop ? shop + "・" : "") + entries.length + "点）";
+
+    var list = document.getElementById("items");
+    entries.forEach(function (entry) {
+      var li = document.createElement("li");
+      var name = document.createElement("span");
+      name.textContent = entry.name;
+      li.appendChild(name);
+      if (entry.memo) {
+        var memo = document.createElement("span");
+        memo.className = "memo";
+        memo.textContent = entry.memo;
+        li.appendChild(memo);
+      }
+      list.appendChild(li);
+    });
+
+    document.getElementById("open").href = "kagoiri://add#" + fragment;
+
+    var copy = document.getElementById("copy");
+    copy.addEventListener("click", function () {
+      var text = entries.map(function (e) { return e.memo ? e.name + " " + e.memo : e.name; }).join("\n");
+      navigator.clipboard.writeText(text).then(function () {
+        copy.textContent = "コピーしました";
+      }, function () {
+        copy.textContent = "コピーできませんでした";
+      });
+    });
+  })();
+</script>
+</body>
+</html>
